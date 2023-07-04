@@ -20,6 +20,8 @@ conn = None
 iRet = 0
 INPUT_PATH = "input/"
 OUTPUT_PATH = "output/"
+FILE_KEEP_SPEC_NUMBER = "special_phonenumber.txt"
+FILE_PROCESSED = 0
 
 #----------------------------------------- Logging ------------------------------------------
 logFormatter = logging.Formatter('[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s')
@@ -81,108 +83,123 @@ if __name__ == "__main__" and MODE == "Unit Test":
     log.info("Start Unit Test")
     import doctest
 
-log.info("Process files on path : {}".format(INPUT_PATH))
+else:
+    log.info("Process files on path : {}".format(INPUT_PATH))
 
-try:
+    try:
 
-    # pattern = r'DESCRIBE_LOG_EVENTS_\d{8}_\d{6}.txt'  # Regex pattern for YYYY-MM-DD format
+        # pattern = r'DESCRIBE_LOG_EVENTS_\d{8}_\d{6}.txt'  # Regex pattern for YYYY-MM-DD format
 
-    # regular (2[0-3]|[01]?[0-9]) = 20-23 and 00-19
-    pattern_filename = r'DESCRIBE_LOG_EVENTS_\d{4}(1[0-2]|[0]?[0-9])([0-3]?[0-9])_(2[0-3]|[01]?[0-9])([0-5]?[0-9])([0-5]?[0-9]).txt'  # Regex pattern for YYYY-MM-DD format
+        # regular (2[0-3]|[01]?[0-9]) = 20-23 and 00-19
+        pattern_filename = r'DESCRIBE_LOG_EVENTS_\d{4}(1[0-2]|[0]?[0-9])([0-3]?[0-9])_(2[0-3]|[01]?[0-9])([0-5]?[0-9])([0-5]?[0-9]).txt'  # Regex pattern for YYYY-MM-DD format
 
-    pattern_special_phonenumber = r'^\(\d{3}\)\d{3}-\d{4}$'
+        pattern_special_phonenumber = r'^\(\d{3}\)\d{3}-\d{4}$'
 
-    # list file from folder INPUT_PATH
-    
-    statistic = {}
-    statistic["active"] = 0
-    statistic["m"] = 0
-    statistic["f"] = 0
-    statistic["min_zipcode"] = 999999999999
-    statistic["max_zipcode"] = 0
-
-    # open write file
-    with open(OUTPUT_PATH + "special_phonenumber.txt.tmp",'w') as fw :
-
-        file_list = os.listdir(INPUT_PATH)
-        for filename in file_list:
-
-            # filter only object type's file
-            if os.path.isfile(INPUT_PATH + filename):
-                if re.search(pattern_filename, filename):
-                    log.info("Found filename : {}".format(filename))
-                    
-                    # open read file
-                    with open(INPUT_PATH + filename) as fs :
-                        contents = fs.readlines()
-                
-                        log.info("file : {} {:0,} record(s)".format(filename,len(contents)))
-                        statistic[filename] = len(contents)
-                        for line in contents:
-
-                            line = line[:-1]
-                            # log.info("{}".format(line))
-
-                            # filter status = active
-                            arr_line = line.split('|')
-
-                            # skip if header & tailer
-                            # header : DATE_TIME|NAME|CITY|ZIPCODE|BBAN|LOCALE|BANK_COUNTRY|IBAN|COUNTRY_CALLING_CODE|MSISDN|PHONE_NUMBER|STATUS|GENDER
-                            # tailer : END;150000
-                            if arr_line[0] == 'DATE_TIME' or "END;" in arr_line[0] :
-                                continue
-
-                            # find speical phone number
-                            # format (XXX)XXX-XXXX
-                            phonenumber = arr_line[10]
-                            if re.search(pattern_special_phonenumber, phonenumber) :
-                                # log.info("{}".format(phonenumber))
-                                fw.writelines(phonenumber + "\n")
-                            
-                            # filter status = 'active'
-                            status = arr_line[11]
-                            if status == 'active' :
-
-                                statistic["active"]+= 1
-                                # log.info("{}".format(line))
-                                # time.sleep(1)
-                            else:
-                                continue
-                            
-                            # cout m or f
-                            gender=arr_line[12]
-                            statistic[gender]+= 1
-
-                            # find min or max zip code
-                            zipcode=int(arr_line[3])
-                            if zipcode < statistic["min_zipcode"] :
-                                statistic["min_zipcode"] = zipcode
-                            elif zipcode > statistic["max_zipcode"] :
-                                statistic["max_zipcode"] = zipcode
-
-
-
-
-    if os.path.exists(OUTPUT_PATH + "special_phonenumber.txt"):
-        log.info("remove file : {} because will replace on next action".format(OUTPUT_PATH + "special_phonenumber.txt"))
-        os.remove(OUTPUT_PATH + "special_phonenumber.txt")
-
-    log.info("rename temp to file : {}".format(OUTPUT_PATH + "special_phonenumber.txt"))
-    os.rename(OUTPUT_PATH + "special_phonenumber.txt.tmp",
-              OUTPUT_PATH + "special_phonenumber.txt")
-    
-    log.info("------------------------------------------------------------------------")
-    log.info("|                             Statistic                                |")
-    log.info("------------------------------------------------------------------------")
-    log.info("- active      : {:0,}".format(statistic["active"]))
-    log.info("- gender m    : {:0,}".format(statistic["m"]))
-    log.info("- gender f    : {:0,}".format(statistic["f"]))
-    log.info("- zipcode min : {}".format(statistic["min_zipcode"]))
-    log.info("- zipcode max : {}".format(statistic["max_zipcode"]))                
+        # list file from folder INPUT_PATH
         
-except FileNotFoundError:
-    print("Folder not found.")
-except NotADirectoryError:
-    print("The specified path is not a directory.")
+        statistic = {}
+        statistic["active"] = 0
+        statistic["m"] = 0
+        statistic["f"] = 0
+        statistic["min_zipcode"] = 999999999999
+        statistic["max_zipcode"] = 0
+
+        
+
+        # open write file
+        with open(OUTPUT_PATH + "special_phonenumber.txt.tmp",'w') as fw :
+            
+            statistic["FILE_PROCESSED"] = 0
+            file_list = os.listdir(INPUT_PATH)
+            for filename in file_list:
+
+                # filter only object type's file
+                if os.path.isfile(INPUT_PATH + filename):
+                    if re.search(pattern_filename, filename):
+                        log.info("Found filename : {}".format(filename))
+                        
+                        iCount_Header_Tailer = 0
+                        # open read file
+                        with open(INPUT_PATH + filename) as fs :
+                            contents = fs.readlines()
+                                                
+                            statistic[filename] = len(contents)
+                            for line in contents:
+
+                                line = line[:-1]
+                                # log.info("{}".format(line))
+
+                                # filter status = active
+                                arr_line = line.split('|')
+
+                                # skip if header & tailer
+                                # header : DATE_TIME|NAME|CITY|ZIPCODE|BBAN|LOCALE|BANK_COUNTRY|IBAN|COUNTRY_CALLING_CODE|MSISDN|PHONE_NUMBER|STATUS|GENDER
+                                # tailer : END;150000
+                                if arr_line[0] == 'DATE_TIME' or "END;" in arr_line[0] :
+                                    iCount_Header_Tailer+=1
+                                    continue
+
+                                # find speical phone number
+                                # format (XXX)XXX-XXXX
+                                phonenumber = arr_line[10]
+                                if re.search(pattern_special_phonenumber, phonenumber) :
+                                    # log.info("{}".format(phonenumber))
+                                    fw.writelines(phonenumber + "\n")
+                                
+                                # filter status = 'active'
+                                status = arr_line[11]
+                                if status == 'active' :
+
+                                    statistic["active"]+= 1
+                                    # log.info("{}".format(line))
+                                    # time.sleep(1)
+                                else:
+                                    continue
+                                
+                                # cout m or f
+                                gender=arr_line[12]
+                                statistic[gender]+= 1
+
+                                # find min or max zip code
+                                zipcode=int(arr_line[3])
+                                if zipcode < statistic["min_zipcode"] :
+                                    statistic["min_zipcode"] = zipcode
+                                elif zipcode > statistic["max_zipcode"] :
+                                    statistic["max_zipcode"] = zipcode
+                            
+                            log.info("file : {} {:0,} record(s)".format(filename,len(contents) - iCount_Header_Tailer))
+
+                        # increment file process
+                        statistic["FILE_PROCESSED"]+= 1
+
+        if os.path.exists(OUTPUT_PATH + FILE_KEEP_SPEC_NUMBER):
+            log.info("remove file : {} because will replace on next action".format(OUTPUT_PATH + FILE_KEEP_SPEC_NUMBER))
+            os.remove(OUTPUT_PATH + FILE_KEEP_SPEC_NUMBER)
+
+        log.info("rename temp to file : {}".format(OUTPUT_PATH + FILE_KEEP_SPEC_NUMBER))
+        os.rename(OUTPUT_PATH + FILE_KEEP_SPEC_NUMBER + ".tmp",
+                  OUTPUT_PATH + FILE_KEEP_SPEC_NUMBER)
+        
+        # open read file
+        with open(OUTPUT_PATH + FILE_KEEP_SPEC_NUMBER) as fs :
+            contents = fs.readlines()
+            statistic["special_number"] = len(contents)
+        
+        log.info("------------------------------------------------------------------------")
+        log.info("|                             Statistic                                |")
+        log.info("------------------------------------------------------------------------")
+        
+        log.info("file processed : {:0,} file(s)".format(statistic["FILE_PROCESSED"]))
+        log.info("active         : {:0,} record(s)".format(statistic["active"]))
+        log.info("gender m       : {:0,} record(s)".format(statistic["m"]))
+        log.info("gender f       : {:0,} record(s)".format(statistic["f"]))
+        log.info("zipcode min    : {:>10}".format(statistic["min_zipcode"]))
+        log.info("zipcode max    : {:>10}".format(statistic["max_zipcode"]))                
+        log.info("phone special  : {:0,} record(s)".format(statistic["special_number"]))                
+            
+    except FileNotFoundError:
+        print("Folder not found.")
+    except NotADirectoryError:
+        print("The specified path is not a directory.")        
 
 sys.exit(iRet) 
